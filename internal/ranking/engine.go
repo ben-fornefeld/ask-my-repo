@@ -3,14 +3,18 @@ package ranking
 import (
 	"context"
 	"sort"
+
+	"github.com/anthropics/anthropic-sdk-go"
 )
 
 type Engine struct {
+	llmClient  *anthropic.Client
 	maxWorkers int
 }
 
-func NewEngine(maxWorkers int) *Engine {
+func NewEngine(llmClient *anthropic.Client, maxWorkers int) *Engine {
 	return &Engine{
+		llmClient:  llmClient,
 		maxWorkers: maxWorkers,
 	}
 }
@@ -62,8 +66,15 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks []CodeChun
 func (e *Engine) rankSingleChunk(ctx context.Context, query string, chunk CodeChunk) (float64, error) {
 	prompt := buildRankingPrompt(query, chunk)
 
-	// TODO: call LLM here
-	response := (prompt)
+	messageParams := anthropic.CompletionNewParams{
+		Model:  anthropic.F(anthropic.ModelClaude3_5HaikuLatest),
+		Prompt: anthropic.F(prompt),
+	}
 
-	return parseScore(response)
+	response, err := e.llmClient.Completions.New(ctx, messageParams)
+	if err != nil {
+		return 0, err
+	}
+
+	return parseScore(response.Completion)
 }
