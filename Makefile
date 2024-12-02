@@ -1,5 +1,5 @@
-test:
-	go test -v ./tests/
+test-backend:
+	cd backend && go test -v ./tests/
 
-run:
-	go run cmd/server/main.go
+run-backend:
+	cd backend && go run cmd/server/main.go

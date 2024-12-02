@@ -8,6 +8,8 @@ import (
 	"rankmyrepo/internal/processor"
 	"rankmyrepo/internal/ranking"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type RankingResponse struct {
@@ -32,7 +34,7 @@ func NewHandler(processor *processor.Processor) (*Handler, error) {
 
 func (h *Handler) RankCode(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	requestID := "1324" // TODO: generate a unique request ID
+	requestID := uuid.New().String()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Request-ID", requestID)
