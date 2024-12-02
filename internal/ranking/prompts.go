@@ -7,17 +7,23 @@ import (
 	"strings"
 )
 
-// TODO: use <thinking> tags for chain of thought
+// TODO: use <thinking> tags for chain of thought if necessary
 
 func buildRankingPrompt(query string, chunk parser.ParsedChunk) string {
-	return `You are a code ranking assistant. Analyze the code snippet's relevance to the query.
+	return `You are a code ranking assistant, which sees code chunks of a code 
+repository and needs to rank the importance of these with regard to the users input query.
+Based on the importance score, the code chunks will be fed into another LLM to give accurate 
+answers to the users query with proper repo context.
+
+Analyze the code snippet's relevance to the query.
 Return ONLY a score between 0.0 and 1.0 wrapped in XML tags <score></score>.
 1.0 means highly relevant, 0.0 means not relevant at all.
 DO NOT include any other text or explanations in your response.
 
 <query>` + query + `</query>
 
-<code>` + chunk.Content + `</code>
+<file>` + chunk.FilePath + `</file>
+<content>` + chunk.Content + `</content>
 
 Remember: Respond ONLY with <score>X</score> where X is a number between 0.0 and 1.0`
 }

@@ -66,6 +66,7 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string
 	return rankedChunks, nil
 }
 
+// TODO: switch to more cheaper / faster model (e.g., groq llama 70b?)
 func (e *Engine) rankSingleChunk(ctx context.Context, query string, chunk parser.ParsedChunk) (float64, error) {
 	prompt := buildRankingPrompt(query, chunk)
 

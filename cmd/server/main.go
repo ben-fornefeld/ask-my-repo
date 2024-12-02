@@ -39,7 +39,7 @@ func main() {
 
 	llmClient := anthropic.NewClient(option.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")))
 
-	ranker := ranking.NewEngine(llmClient, 5)
+	ranker := ranking.NewEngine(llmClient, 10)
 
 	processor := processor.NewProcessor(parser, ranker)
 
