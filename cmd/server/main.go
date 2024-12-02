@@ -8,9 +8,8 @@ import (
 )
 
 func main() {
-	// TODO : init components
-
-	parser, err := parser.NewParser()
+	parserIgnorePatterns := []string{}
+	parser, err := parser.NewParser(parserIgnorePatterns)
 	if err != nil {
 		log.Fatal(err)
 	}

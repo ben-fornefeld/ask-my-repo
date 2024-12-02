@@ -3,11 +3,14 @@ package parser
 import (
 	"context"
 	"rankmyrepo/internal/parser"
+	"strings"
 	"testing"
 )
 
 func TestParseRepository(t *testing.T) {
-	p, err := parser.NewParser(make([]string, 0))
+	patterns := []string{"*.md"}
+
+	p, err := parser.NewParser(patterns)
 	if err != nil {
 		t.Fatalf("failed to create parser: %v", err)
 	}
@@ -21,6 +24,12 @@ func TestParseRepository(t *testing.T) {
 
 	if len(chunks) == 0 {
 		t.Error("expected chunks to be returned, got empty slice")
+	}
+
+	for _, chunk := range chunks {
+		if strings.HasSuffix(chunk.FilePath, ".md") {
+			t.Errorf("found blacklisted .md file in chunks: %s", chunk.FilePath)
+		}
 	}
 
 	t.Logf("Found %d chunks in repository:", len(chunks))

@@ -7,27 +7,41 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/sabhiram/go-gitignore"
 )
 
 type Parser struct {
-	tempDir           string
-	filteredFileTypes []string
+	tempDir string
+	ignore  *ignore.GitIgnore
 }
 
-func NewParser(filteredFileTypes []string) (*Parser, error) {
+func NewParser(ignorePatterns []string) (*Parser, error) {
 	tempDir, err := os.MkdirTemp("", "repo-parser-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
+	for i, pattern := range ignorePatterns {
+		if !strings.HasPrefix(pattern, "/") {
+			ignorePatterns[i] = "**/" + pattern
+		}
+	}
+
+	ignore := ignore.CompileIgnoreLines(ignorePatterns...)
+
 	return &Parser{
-		tempDir:           tempDir,
-		filteredFileTypes: filteredFileTypes,
+		tempDir: tempDir,
+		ignore:  ignore,
 	}, nil
 }
 
+// ParseRepository parses the repository at the given URL and returns a map of RawChunk
+// with the file paths as keys and the content as values.
+
+// NOTE: This currently only supports Public GitHub repositories.
 func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[string]RawChunk, error) {
 	repoDir := filepath.Join(p.tempDir, filepath.Base(repoURL))
 
@@ -56,7 +70,14 @@ func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[strin
 			return nil
 		}
 
-		// TODO: filter file types
+		relPath, err := filepath.Rel(repoDir, path)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path: %w", err)
+		}
+
+		if p.ignore.MatchesPath(relPath) {
+			return nil
+		}
 
 		file, err := os.Open(path)
 		if err != nil {
