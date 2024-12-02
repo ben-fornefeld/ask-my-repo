@@ -3,11 +3,15 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"rankmyrepo/internal/api"
+	"rankmyrepo/internal/completion"
 	"rankmyrepo/internal/parser"
 	"rankmyrepo/internal/processor"
 	"rankmyrepo/internal/ranking"
 
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/joho/godotenv"
 	"github.com/replicate/replicate-go"
 )
@@ -38,9 +42,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ranker := ranking.NewEngine(r8, 100, 0.4)
+	ranker := ranking.NewEngine(r8, 100)
 
-	processor := processor.NewProcessor(parser, ranker)
+	anthropicClient := anthropic.NewClient(option.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	completion := completion.NewCompletion(anthropicClient)
+
+	processor := processor.NewProcessor(parser, ranker, completion)
 
 	handler, err := api.NewHandler(processor)
 	if err != nil {

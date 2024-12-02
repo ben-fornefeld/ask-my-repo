@@ -22,14 +22,14 @@ func TestParseRepository(t *testing.T) {
 
 	patterns := []string{"*.md"}
 
-	p, err := parser.NewParser(patterns, textMimeTypes)
+	p, err := parser.NewParser(textMimeTypes)
 	if err != nil {
 		t.Fatalf("failed to create parser: %v", err)
 	}
 	defer p.Cleanup()
 
 	repoURL := "https://github.com/ben-fornefeld/neo"
-	chunks, err := p.ParseRepository(context.Background(), repoURL)
+	chunks, err := p.ParseRepository(context.Background(), repoURL, patterns)
 	if err != nil {
 		t.Fatalf("failed to parse repository: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestTextFileFilter(t *testing.T) {
 		"application/x-shellscript": true,
 	}
 
-	parser, err := parser.NewParser(make([]string, 0), textMimeTypes)
+	parser, err := parser.NewParser(textMimeTypes)
 	if err != nil {
 		t.Fatalf("failed to create parser: %v", err)
 	}

@@ -11,20 +11,18 @@ import (
 )
 
 type Engine struct {
-	r8             *replicate.Client
-	maxWorkers     int
-	scoreThreshold float64
+	r8         *replicate.Client
+	maxWorkers int
 }
 
-func NewEngine(r8 *replicate.Client, maxWorkers int, scoreThreshold float64) *Engine {
+func NewEngine(r8 *replicate.Client, maxWorkers int) *Engine {
 	return &Engine{
-		r8:             r8,
-		maxWorkers:     maxWorkers,
-		scoreThreshold: scoreThreshold,
+		r8:         r8,
+		maxWorkers: maxWorkers,
 	}
 }
 
-func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string]parser.ParsedChunk) ([]RankedChunk, error) {
+func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string]parser.ParsedChunk, scoreThreshold float64) ([]RankedChunk, error) {
 	log.Printf("Starting to rank %d chunks for query: %s", len(chunks), query)
 	// worker pool for parallel ranking
 	results := make(chan RankedChunk, len(chunks))
@@ -40,7 +38,7 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string
 
 			log.Printf("Ranking chunk %s", c.FilePath)
 
-			score, err := e.rankSingleChunk(ctx, query, c)
+			score, err := e.RankSingleChunk(ctx, query, c)
 			if err != nil {
 				errors <- err
 				return
@@ -68,16 +66,22 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string
 		}
 	}
 
-	sort.Slice(rankedChunks, func(i, j int) bool {
-		return rankedChunks[i].Score > rankedChunks[j].Score
+	filteredChunks := make([]RankedChunk, 0, len(rankedChunks))
+	for _, chunk := range rankedChunks {
+		if chunk.Score >= scoreThreshold {
+			filteredChunks = append(filteredChunks, chunk)
+		}
+	}
+
+	sort.Slice(filteredChunks, func(i, j int) bool {
+		return filteredChunks[i].Score < filteredChunks[j].Score
 	})
 
-	log.Printf("Finished ranking %d chunks. Top score: %.2f", len(rankedChunks), rankedChunks[0].Score)
-	return rankedChunks, nil
+	log.Printf("Finished ranking %d chunks. After Threshold: %d", len(rankedChunks), len(filteredChunks))
+	return filteredChunks, nil
 }
 
-// TODO: switch to more cheaper / faster model (e.g., groq llama 70b?)
-func (e *Engine) rankSingleChunk(ctx context.Context, query string, chunk parser.ParsedChunk) (float64, error) {
+func (e *Engine) RankSingleChunk(ctx context.Context, query string, chunk parser.ParsedChunk) (float64, error) {
 	prompt := buildRankingPrompt(query, chunk)
 
 	model := "meta/meta-llama-3-70b-instruct"
@@ -100,7 +104,6 @@ func (e *Engine) rankSingleChunk(ctx context.Context, query string, chunk parser
 
 	var result string
 	for _, token := range tokens {
-		// Convert each token to string
 		if str, ok := token.(string); ok {
 			result += str
 		}

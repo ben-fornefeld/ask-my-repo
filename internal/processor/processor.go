@@ -2,19 +2,22 @@ package processor
 
 import (
 	"context"
+	"rankmyrepo/internal/completion"
 	"rankmyrepo/internal/parser"
 	"rankmyrepo/internal/ranking"
 )
 
 type Processor struct {
-	parser *parser.Parser
-	ranker *ranking.Engine
+	parser     *parser.Parser
+	ranker     *ranking.Engine
+	completion *completion.Completion
 }
 
-func NewProcessor(parser *parser.Parser, ranker *ranking.Engine) *Processor {
+func NewProcessor(parser *parser.Parser, ranker *ranking.Engine, compcompletion *completion.Completion) *Processor {
 	return &Processor{
-		parser: parser,
-		ranker: ranker,
+		parser:     parser,
+		ranker:     ranker,
+		completion: compcompletion,
 	}
 }
 
@@ -24,14 +27,19 @@ func (p *Processor) ProcessRankingRequest(ctx context.Context, req *ranking.Rank
 		return nil, err
 	}
 
-	rankedChunks, err := p.ranker.RankChunks(ctx, req.Query, parsedChunks)
+	rankedChunks, err := p.ranker.RankChunks(ctx, req.Query, parsedChunks, req.ScoreThreshold)
+	if err != nil {
+		return nil, err
+	}
+
+	completion, err := p.completion.Run(ctx, req.Query, rankedChunks)
 	if err != nil {
 		return nil, err
 	}
 
 	result := ranking.RankingResponse{
 		Chunks:     rankedChunks,
-		TotalScore: 0,
+		Completion: completion,
 	}
 
 	return &result, nil

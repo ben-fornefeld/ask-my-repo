@@ -18,9 +18,10 @@ type RankingRequest struct {
 	Query          string
 	RepoPath       string
 	IgnorePatterns []string
+	ScoreThreshold float64
 }
 
 type RankingResponse struct {
 	Chunks     []RankedChunk
-	TotalScore float64
+	Completion string
 }

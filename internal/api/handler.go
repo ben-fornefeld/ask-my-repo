@@ -96,6 +96,9 @@ func (h *Handler) validateRequest(req *ranking.RankingRequest) error {
 	if req.IgnorePatterns == nil {
 		return errors.New("ignore patterns cannot be empty")
 	}
+	if req.ScoreThreshold <= 0 || req.ScoreThreshold > 1 {
+		return errors.New("score threshold must be between 0 and 1 (inclusive)")
+	}
 	return nil
 }
 
