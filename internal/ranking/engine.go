@@ -38,6 +38,8 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
+			log.Printf("Ranking chunk %s", c.FilePath)
+
 			score, err := e.rankSingleChunk(ctx, query, c)
 			if err != nil {
 				errors <- err

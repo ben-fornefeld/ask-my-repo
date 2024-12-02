@@ -27,9 +27,7 @@ func main() {
 		"application/x-shellscript": true,
 	}
 
-	parserIgnorePatterns := []string{"*.min.js"}
-
-	parser, err := parser.NewParser(parserIgnorePatterns, textMimeTypes)
+	parser, err := parser.NewParser(textMimeTypes)
 	if err != nil {
 		log.Fatal(err)
 	}

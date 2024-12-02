@@ -15,27 +15,17 @@ import (
 
 type Parser struct {
 	tempDir       string
-	ignore        *ignore.GitIgnore
 	textMimeTypes map[string]bool
 }
 
-func NewParser(ignorePatterns []string, textMimeTypes map[string]bool) (*Parser, error) {
+func NewParser(textMimeTypes map[string]bool) (*Parser, error) {
 	tempDir, err := os.MkdirTemp("", "repo-parser-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	for i, pattern := range ignorePatterns {
-		if !strings.HasPrefix(pattern, "/") {
-			ignorePatterns[i] = "**/" + pattern
-		}
-	}
-
-	ignore := ignore.CompileIgnoreLines(ignorePatterns...)
-
 	return &Parser{
 		tempDir:       tempDir,
-		ignore:        ignore,
 		textMimeTypes: textMimeTypes,
 	}, nil
 }
@@ -45,7 +35,7 @@ func NewParser(ignorePatterns []string, textMimeTypes map[string]bool) (*Parser,
 
 // NOTE: This currently only supports Public GitHub repositories.
 
-func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[string]ParsedChunk, error) {
+func (p *Parser) ParseRepository(ctx context.Context, repoURL string, ignorePatterns []string) (map[string]ParsedChunk, error) {
 	repoDir := filepath.Join(p.tempDir, filepath.Base(repoURL))
 
 	_, err := git.PlainCloneContext(ctx, repoDir, false, &git.CloneOptions{
@@ -61,6 +51,14 @@ func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[strin
 			fmt.Printf("warning: failed to clean up repository directory: %v\n", err)
 		}
 	}()
+
+	for i, pattern := range ignorePatterns {
+		if !strings.HasPrefix(pattern, "/") {
+			ignorePatterns[i] = "**/" + pattern
+		}
+	}
+
+	ignore := ignore.CompileIgnoreLines(ignorePatterns...)
 
 	chunks := make(map[string]ParsedChunk, 0)
 
@@ -78,7 +76,7 @@ func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[strin
 			return fmt.Errorf("failed to get relative path: %w", err)
 		}
 
-		if p.ignore.MatchesPath(relPath) {
+		if ignore.MatchesPath(relPath) {
 			return nil
 		}
 

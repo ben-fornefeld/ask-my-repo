@@ -11,7 +11,6 @@ import (
 )
 
 type RankingResponse struct {
-	// TODO: add results
 	Results     *ranking.RankingResponse `json:"results"`
 	ProcessTime time.Duration            `json:"process_time"`
 	RequestID   string                   `json:"request_id"`
@@ -93,6 +92,9 @@ func (h *Handler) validateRequest(req *ranking.RankingRequest) error {
 	}
 	if req.RepoPath == "" {
 		return errors.New("repository path cannot be empty")
+	}
+	if req.IgnorePatterns == nil {
+		return errors.New("ignore patterns cannot be empty")
 	}
 	return nil
 }

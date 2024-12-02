@@ -19,7 +19,7 @@ func NewProcessor(parser *parser.Parser, ranker *ranking.Engine) *Processor {
 }
 
 func (p *Processor) ProcessRankingRequest(ctx context.Context, req *ranking.RankingRequest) (*ranking.RankingResponse, error) {
-	parsedChunks, err := p.parser.ParseRepository(ctx, req.RepoPath)
+	parsedChunks, err := p.parser.ParseRepository(ctx, req.RepoPath, req.IgnorePatterns)
 	if err != nil {
 		return nil, err
 	}

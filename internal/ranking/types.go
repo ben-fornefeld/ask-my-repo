@@ -15,8 +15,9 @@ type RankingEngine interface {
 }
 
 type RankingRequest struct {
-	Query    string
-	RepoPath string
+	Query          string
+	RepoPath       string
+	IgnorePatterns []string
 }
 
 type RankingResponse struct {
