@@ -9,6 +9,11 @@ import (
 
 // TODO: use <thinking> tags for chain of thought if necessary
 
+var systemPrompt = `You are a code ranking assistant, which sees code chunks of a code 
+repository and needs to rank the importance of these with regard to the users input query.
+Based on the importance score, the code chunks will be fed into another LLM to give accurate 
+answers to the users query with proper repo context.`
+
 func buildRankingPrompt(query string, chunk parser.ParsedChunk) string {
 	return `You are a code ranking assistant, which sees code chunks of a code 
 repository and needs to rank the importance of these with regard to the users input query.

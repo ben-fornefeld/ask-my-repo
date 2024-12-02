@@ -2,25 +2,30 @@ package ranking
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"rankmyrepo/internal/parser"
 	"sort"
 
-	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/replicate/replicate-go"
 )
 
 type Engine struct {
-	llmClient  *anthropic.Client
-	maxWorkers int
+	r8             *replicate.Client
+	maxWorkers     int
+	scoreThreshold float64
 }
 
-func NewEngine(llmClient *anthropic.Client, maxWorkers int) *Engine {
+func NewEngine(r8 *replicate.Client, maxWorkers int, scoreThreshold float64) *Engine {
 	return &Engine{
-		llmClient:  llmClient,
-		maxWorkers: maxWorkers,
+		r8:             r8,
+		maxWorkers:     maxWorkers,
+		scoreThreshold: scoreThreshold,
 	}
 }
 
 func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string]parser.ParsedChunk) ([]RankedChunk, error) {
+	log.Printf("Starting to rank %d chunks for query: %s", len(chunks), query)
 	// worker pool for parallel ranking
 	results := make(chan RankedChunk, len(chunks))
 	errors := make(chan error, len(chunks))
@@ -39,10 +44,12 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string
 				return
 			}
 
-			results <- RankedChunk{
+			ranked := RankedChunk{
 				ParsedChunk: c,
 				Score:       score,
 			}
+			log.Printf("Ranked chunk %s with score %.2f", c.FilePath, score)
+			results <- ranked
 		}(chunk)
 	}
 
@@ -63,6 +70,7 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string
 		return rankedChunks[i].Score > rankedChunks[j].Score
 	})
 
+	log.Printf("Finished ranking %d chunks. Top score: %.2f", len(rankedChunks), rankedChunks[0].Score)
 	return rankedChunks, nil
 }
 
@@ -70,16 +78,31 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string
 func (e *Engine) rankSingleChunk(ctx context.Context, query string, chunk parser.ParsedChunk) (float64, error) {
 	prompt := buildRankingPrompt(query, chunk)
 
-	message, err := e.llmClient.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.F(anthropic.ModelClaude3_5HaikuLatest),
-		MaxTokens: anthropic.F(int64(1024)),
-		Messages: anthropic.F([]anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
-		}),
-	})
-	if err != nil {
-		return 0, err
+	model := "meta/meta-llama-3-70b-instruct"
+
+	input := replicate.PredictionInput{
+		"prompt":        prompt,
+		"system_prompt": systemPrompt,
+		"temperature":   0.1,
 	}
 
-	return parseScore(message.ToParam().Content.String())
+	output, err := e.r8.Run(ctx, model, input, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to run model: %w", err)
+	}
+
+	tokens, ok := output.([]interface{})
+	if !ok {
+		return 0, fmt.Errorf("unexpected output type from model: got %T, want []interface{}", output)
+	}
+
+	var result string
+	for _, token := range tokens {
+		// Convert each token to string
+		if str, ok := token.(string); ok {
+			result += str
+		}
+	}
+
+	return parseScore(result)
 }
