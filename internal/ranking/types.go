@@ -10,9 +10,8 @@ type RankedChunk struct {
 	Score       float64
 }
 
-// TODO: use interface in engine.go
 type RankingEngine interface {
-	RankChunks(ctx context.Context, query string, chunks []RankedChunk) ([]RankedChunk, error)
+	RankChunks(ctx context.Context, query string, chunks map[string]parser.ParsedChunk) ([]RankedChunk, error)
 }
 
 type RankingRequest struct {

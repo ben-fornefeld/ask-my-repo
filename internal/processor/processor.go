@@ -2,28 +2,37 @@ package processor
 
 import (
 	"context"
+	"rankmyrepo/internal/parser"
 	"rankmyrepo/internal/ranking"
 )
 
 type Processor struct {
-	// TODO: add parser
-	ranker ranking.RankingEngine
+	parser *parser.Parser
+	ranker *ranking.Engine
 }
 
-func NewProcessor(ranker ranking.RankingEngine) *Processor {
+func NewProcessor(parser *parser.Parser, ranker *ranking.Engine) *Processor {
 	return &Processor{
+		parser: parser,
 		ranker: ranker,
 	}
 }
 
 func (p *Processor) ProcessRankingRequest(ctx context.Context, req *ranking.RankingRequest) (*ranking.RankingResponse, error) {
-	// TODO: chunk repository
+	parsedChunks, err := p.parser.ParseRepository(ctx, req.RepoPath)
+	if err != nil {
+		return nil, err
+	}
 
-	// prefilter chunks
+	rankedChunks, err := p.ranker.RankChunks(ctx, req.Query, parsedChunks)
+	if err != nil {
+		return nil, err
+	}
 
-	// rank chunks
+	result := ranking.RankingResponse{
+		Chunks:     rankedChunks,
+		TotalScore: 0,
+	}
 
-	// assemble context
-
-	return nil, nil
+	return &result, nil
 }

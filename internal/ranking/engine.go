@@ -20,7 +20,7 @@ func NewEngine(llmClient *anthropic.Client, maxWorkers int) *Engine {
 	}
 }
 
-func (e *Engine) RankChunks(ctx context.Context, query string, chunks []parser.ParsedChunk) ([]RankedChunk, error) {
+func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string]parser.ParsedChunk) ([]RankedChunk, error) {
 	// worker pool for parallel ranking
 	results := make(chan RankedChunk, len(chunks))
 	errors := make(chan error, len(chunks))
@@ -69,15 +69,16 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks []parser.P
 func (e *Engine) rankSingleChunk(ctx context.Context, query string, chunk parser.ParsedChunk) (float64, error) {
 	prompt := buildRankingPrompt(query, chunk)
 
-	messageParams := anthropic.CompletionNewParams{
-		Model:  anthropic.F(anthropic.ModelClaude3_5HaikuLatest),
-		Prompt: anthropic.F(prompt),
-	}
-
-	response, err := e.llmClient.Completions.New(ctx, messageParams)
+	message, err := e.llmClient.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.F(anthropic.ModelClaude3_5HaikuLatest),
+		MaxTokens: anthropic.F(int64(1024)),
+		Messages: anthropic.F([]anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
+		}),
+	})
 	if err != nil {
 		return 0, err
 	}
 
-	return parseScore(response.Completion)
+	return parseScore(message.ToParam().Content.String())
 }

@@ -14,11 +14,12 @@ import (
 )
 
 type Parser struct {
-	tempDir string
-	ignore  *ignore.GitIgnore
+	tempDir       string
+	ignore        *ignore.GitIgnore
+	textMimeTypes map[string]bool
 }
 
-func NewParser(ignorePatterns []string) (*Parser, error) {
+func NewParser(ignorePatterns []string, textMimeTypes map[string]bool) (*Parser, error) {
 	tempDir, err := os.MkdirTemp("", "repo-parser-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
@@ -33,8 +34,9 @@ func NewParser(ignorePatterns []string) (*Parser, error) {
 	ignore := ignore.CompileIgnoreLines(ignorePatterns...)
 
 	return &Parser{
-		tempDir: tempDir,
-		ignore:  ignore,
+		tempDir:       tempDir,
+		ignore:        ignore,
+		textMimeTypes: textMimeTypes,
 	}, nil
 }
 
@@ -42,6 +44,7 @@ func NewParser(ignorePatterns []string) (*Parser, error) {
 // with the file paths as keys and the content as values.
 
 // NOTE: This currently only supports Public GitHub repositories.
+
 func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[string]ParsedChunk, error) {
 	repoDir := filepath.Join(p.tempDir, filepath.Base(repoURL))
 
@@ -84,6 +87,14 @@ func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[strin
 			return err
 		}
 		defer file.Close()
+
+		isText, err := p.IsTextFile(file)
+		if err != nil {
+			return fmt.Errorf("failed to check if file is text: %w", err)
+		}
+		if !isText {
+			return nil
+		}
 
 		content, err := io.ReadAll(file)
 		if err != nil {
