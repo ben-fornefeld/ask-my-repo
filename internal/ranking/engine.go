@@ -2,6 +2,7 @@ package ranking
 
 import (
 	"context"
+	"rankmyrepo/internal/parser"
 	"sort"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -19,7 +20,7 @@ func NewEngine(llmClient *anthropic.Client, maxWorkers int) *Engine {
 	}
 }
 
-func (e *Engine) RankChunks(ctx context.Context, query string, chunks []RankedChunk) ([]RankedChunk, error) {
+func (e *Engine) RankChunks(ctx context.Context, query string, chunks []parser.ParsedChunk) ([]RankedChunk, error) {
 	// worker pool for parallel ranking
 	results := make(chan RankedChunk, len(chunks))
 	errors := make(chan error, len(chunks))
@@ -28,7 +29,7 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks []RankedCh
 	sem := make(chan struct{}, e.maxWorkers)
 
 	for _, chunk := range chunks {
-		go func(c RankedChunk) {
+		go func(c parser.ParsedChunk) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
@@ -38,8 +39,10 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks []RankedCh
 				return
 			}
 
-			c.Score = score
-			results <- c
+			results <- RankedChunk{
+				ParsedChunk: c,
+				Score:       score,
+			}
 		}(chunk)
 	}
 
@@ -63,7 +66,7 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks []RankedCh
 	return rankedChunks, nil
 }
 
-func (e *Engine) rankSingleChunk(ctx context.Context, query string, chunk RankedChunk) (float64, error) {
+func (e *Engine) rankSingleChunk(ctx context.Context, query string, chunk parser.ParsedChunk) (float64, error) {
 	prompt := buildRankingPrompt(query, chunk)
 
 	messageParams := anthropic.CompletionNewParams{

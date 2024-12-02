@@ -42,7 +42,7 @@ func NewParser(ignorePatterns []string) (*Parser, error) {
 // with the file paths as keys and the content as values.
 
 // NOTE: This currently only supports Public GitHub repositories.
-func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[string]RawChunk, error) {
+func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[string]ParsedChunk, error) {
 	repoDir := filepath.Join(p.tempDir, filepath.Base(repoURL))
 
 	_, err := git.PlainCloneContext(ctx, repoDir, false, &git.CloneOptions{
@@ -59,7 +59,7 @@ func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[strin
 		}
 	}()
 
-	chunks := make(map[string]RawChunk, 0)
+	chunks := make(map[string]ParsedChunk, 0)
 
 	filepath.WalkDir(repoDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -90,7 +90,7 @@ func (p *Parser) ParseRepository(ctx context.Context, repoURL string) (map[strin
 			return fmt.Errorf("failed to read file %s: %w", path, err)
 		}
 
-		chunk := RawChunk{
+		chunk := ParsedChunk{
 			FilePath: path,
 			Content:  string(content),
 		}

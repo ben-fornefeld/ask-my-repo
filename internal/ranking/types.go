@@ -1,15 +1,13 @@
 package ranking
 
-import "context"
+import (
+	"context"
+	"rankmyrepo/internal/parser"
+)
 
 type RankedChunk struct {
-	Content   string
-	FilePath  string
-	StartLine int
-	EndLine   int
-	Language  string
-	Symbols   []string
-	Score     float64
+	ParsedChunk parser.ParsedChunk
+	Score       float64
 }
 
 // TODO: use interface in engine.go

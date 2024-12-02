@@ -1,6 +1,6 @@
 package parser
 
-type RawChunk struct {
+type ParsedChunk struct {
 	Content  string
 	FilePath string
 }
