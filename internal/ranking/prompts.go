@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// TODO: use <thinking> tags for chain of thought
+
 func buildRankingPrompt(query string, chunk CodeChunk) string {
 	return `You are a code ranking assistant. Analyze the code snippet's relevance to the query.
 Return ONLY a score between 0.0 and 1.0 wrapped in XML tags <score></score>.

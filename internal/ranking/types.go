@@ -13,6 +13,16 @@ type CodeChunk struct {
 }
 
 // TODO: use interface in engine.go
-type RankingInterface interface {
+type RankingEngine interface {
 	RankChunks(ctx context.Context, query string, chunks []CodeChunk) ([]CodeChunk, error)
+}
+
+type RankingRequest struct {
+	Query    string
+	RepoPath string
+}
+
+type RankingResponse struct {
+	Chunks     []CodeChunk
+	TotalScore float64
 }
