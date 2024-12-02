@@ -8,7 +8,7 @@ import (
 
 // TODO: use <thinking> tags for chain of thought
 
-func buildRankingPrompt(query string, chunk CodeChunk) string {
+func buildRankingPrompt(query string, chunk RankedChunk) string {
 	return `You are a code ranking assistant. Analyze the code snippet's relevance to the query.
 Return ONLY a score between 0.0 and 1.0 wrapped in XML tags <score></score>.
 1.0 means highly relevant, 0.0 means not relevant at all.

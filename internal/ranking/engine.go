@@ -19,16 +19,16 @@ func NewEngine(llmClient *anthropic.Client, maxWorkers int) *Engine {
 	}
 }
 
-func (e *Engine) RankChunks(ctx context.Context, query string, chunks []CodeChunk) ([]CodeChunk, error) {
+func (e *Engine) RankChunks(ctx context.Context, query string, chunks []RankedChunk) ([]RankedChunk, error) {
 	// worker pool for parallel ranking
-	results := make(chan CodeChunk, len(chunks))
+	results := make(chan RankedChunk, len(chunks))
 	errors := make(chan error, len(chunks))
 
 	// semaphore to limit concurrent LLM calls
 	sem := make(chan struct{}, e.maxWorkers)
 
 	for _, chunk := range chunks {
-		go func(c CodeChunk) {
+		go func(c RankedChunk) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
@@ -44,7 +44,7 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks []CodeChun
 	}
 
 	// collect results
-	rankedChunks := make([]CodeChunk, 0, len(chunks))
+	rankedChunks := make([]RankedChunk, 0, len(chunks))
 	for i := 0; i < len(chunks); i++ {
 		select {
 		case chunk := <-results:
@@ -63,7 +63,7 @@ func (e *Engine) RankChunks(ctx context.Context, query string, chunks []CodeChun
 	return rankedChunks, nil
 }
 
-func (e *Engine) rankSingleChunk(ctx context.Context, query string, chunk CodeChunk) (float64, error) {
+func (e *Engine) rankSingleChunk(ctx context.Context, query string, chunk RankedChunk) (float64, error) {
 	prompt := buildRankingPrompt(query, chunk)
 
 	messageParams := anthropic.CompletionNewParams{

@@ -2,7 +2,7 @@ package ranking
 
 import "context"
 
-type CodeChunk struct {
+type RankedChunk struct {
 	Content   string
 	FilePath  string
 	StartLine int
@@ -14,7 +14,7 @@ type CodeChunk struct {
 
 // TODO: use interface in engine.go
 type RankingEngine interface {
-	RankChunks(ctx context.Context, query string, chunks []CodeChunk) ([]CodeChunk, error)
+	RankChunks(ctx context.Context, query string, chunks []RankedChunk) ([]RankedChunk, error)
 }
 
 type RankingRequest struct {
@@ -23,6 +23,6 @@ type RankingRequest struct {
 }
 
 type RankingResponse struct {
-	Chunks     []CodeChunk
+	Chunks     []RankedChunk
 	TotalScore float64
 }
