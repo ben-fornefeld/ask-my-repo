@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import PromptForm from "./prompt-form";
 import RenderCompletion from "./render-completion";
 import type {
@@ -13,6 +13,7 @@ interface ChatState {
   parsedChunks: ParsedChunk[];
   rankedChunks: RankedChunk[];
   completion?: string;
+  completionBuffer: string;
 }
 
 export default function Chat() {
@@ -20,114 +21,168 @@ export default function Chat() {
     isLoading: false,
     parsedChunks: [],
     rankedChunks: [],
+    completionBuffer: "",
   });
 
-  const handleSubmit = useCallback(async (query: string, repopath: string) => {
-    // Reset state
-    setState({
-      isLoading: true,
-      parsedChunks: [],
-      rankedChunks: [],
-    });
+  const batchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const completionQueueRef = useRef<string>("");
+  const isProcessingRef = useRef<boolean>(false);
 
-    const body = {
-      query,
-      repopath,
-      ignorepatterns: ["example/"],
-      scorethreshold: 0.2,
-    };
+  const insertCompletionInBatches = useCallback(async (content: string) => {
+    const batchSize = 2;
+    const intervalMs = 6;
+    let index = 0;
 
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL}/query`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-          credentials: "include",
+    return new Promise<void>((resolve) => {
+      const intervalId = setInterval(() => {
+        if (index < content.length) {
+          const batch = content.slice(index, index + batchSize);
+          setState((prevState) => ({
+            ...prevState,
+            completion: (prevState.completion || "") + batch,
+          }));
+          index += batchSize;
+        } else {
+          clearInterval(intervalId);
+          resolve();
         }
-      );
+      }, intervalMs);
+    });
+  }, []);
 
-      if (!response.ok || !response.body) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  const processQueue = useCallback(async () => {
+    if (isProcessingRef.current || !completionQueueRef.current) {
+      return;
+    }
 
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder("utf-8");
-      let buffer = "";
+    isProcessingRef.current = true;
+    const content = completionQueueRef.current;
+    completionQueueRef.current = "";
 
-      while (true as const) {
-        const { value, done } = await reader.read();
-        if (done) break;
+    await insertCompletionInBatches(content);
+    isProcessingRef.current = false;
 
-        buffer += decoder.decode(value, { stream: true });
+    if (completionQueueRef.current) {
+      processQueue();
+    }
+  }, [insertCompletionInBatches]);
 
-        const messages = buffer.split("\n\n");
-        buffer = messages.pop() || "";
+  const handleSubmit = useCallback(
+    async (query: string, repopath: string) => {
+      setState({
+        isLoading: true,
+        parsedChunks: [],
+        rankedChunks: [],
+        completionBuffer: "",
+      });
 
-        for (const message of messages) {
-          if (message.startsWith("data: ")) {
-            const jsonStr = message.slice(6);
-            const chunk: QueryResponseChunk = JSON.parse(jsonStr);
+      const body = {
+        query,
+        repopath,
+        ignorepatterns: ["example/"],
+        scorethreshold: 0.2,
+      };
 
-            setState((prevState) => {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/query`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+            credentials: "include",
+          }
+        );
+
+        if (!response.ok || !response.body) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true as const) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          const messages = buffer.split("\n\n");
+          buffer = messages.pop() || "";
+
+          for (const message of messages) {
+            if (message.startsWith("data: ")) {
+              const jsonStr = message.slice(6);
+              const chunk: QueryResponseChunk = JSON.parse(jsonStr);
+
               switch (chunk.type) {
-                case "ranking.parsed":
-                  return chunk.parsed_chunk
-                    ? {
-                        ...prevState,
-                        parsedChunks: [
-                          ...prevState.parsedChunks,
-                          chunk.parsed_chunk,
-                        ],
-                      }
-                    : prevState;
+                case "ranking.parsed": {
+                  if (chunk.parsed_chunk) {
+                    setState((prevState) => ({
+                      ...prevState,
+                      parsedChunks: [
+                        ...prevState.parsedChunks,
+                        chunk.parsed_chunk!,
+                      ],
+                    }));
+                  }
+                  break;
+                }
 
-                case "ranking.ranked":
-                  return chunk.ranked_chunk
-                    ? {
-                        ...prevState,
-                        rankedChunks: [
-                          ...prevState.rankedChunks,
-                          chunk.ranked_chunk,
-                        ],
-                      }
-                    : prevState;
+                case "ranking.ranked": {
+                  if (chunk.ranked_chunk) {
+                    setState((prevState) => ({
+                      ...prevState,
+                      rankedChunks: [
+                        ...prevState.rankedChunks,
+                        chunk.ranked_chunk!,
+                      ],
+                    }));
+                  }
+                  break;
+                }
 
-                case "completion.delta":
-                  return chunk.completion
-                    ? {
-                        ...prevState,
-                        completion:
-                          (prevState.completion || "") + chunk.completion,
-                        isLoading: false,
-                      }
-                    : prevState;
+                case "completion.delta": {
+                  if (chunk.completion) {
+                    completionQueueRef.current += chunk.completion;
+                    await processQueue();
+                  }
+                  break;
+                }
 
-                case "error":
-                  return {
+                case "error": {
+                  setState((prevState) => ({
                     ...prevState,
                     error: chunk.error,
                     isLoading: false,
-                  };
-
-                default:
-                  return prevState;
+                  }));
+                  break;
+                }
               }
-            });
+            }
           }
         }
+      } catch (error) {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error:
+            error instanceof Error ? error.message : "Unknown error occurred",
+        }));
       }
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
-      }));
-    }
+    },
+    [processQueue]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (batchTimeoutRef.current) {
+        clearTimeout(batchTimeoutRef.current);
+      }
+    };
   }, []);
 
   return (
