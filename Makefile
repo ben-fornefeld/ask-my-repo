@@ -8,8 +8,7 @@ test-backend:
 	cd backend && go test -v ./tests/
 
 run-backend:
-	cd backend && go run cmd/server/main.go
-
+	cd backend && air
 
 dev-frontend:
 	cd frontend && bun run dev

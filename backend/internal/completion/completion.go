@@ -5,6 +5,7 @@ import (
 	"rankmyrepo/internal/ranking"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 )
 
 type Completion struct {
@@ -17,7 +18,7 @@ func NewCompletion(anthropicClient *anthropic.Client) *Completion {
 	}
 }
 
-func (c *Completion) Run(ctx context.Context, query string, chunks []ranking.RankedChunk) (string, error) {
+func (c *Completion) Run(ctx context.Context, query string, chunks []ranking.RankedChunk) *ssestream.Stream[anthropic.MessageStreamEvent] {
 	prompt := buildCompletionPrompt(query, chunks)
 
 	messageParams := anthropic.MessageNewParams{
@@ -28,10 +29,7 @@ func (c *Completion) Run(ctx context.Context, query string, chunks []ranking.Ran
 		MaxTokens: anthropic.Int(8000),
 	}
 
-	message, err := c.anthropicClient.Messages.New(ctx, messageParams)
-	if err != nil {
-		return "", err
-	}
+	stream := c.anthropicClient.Messages.NewStreaming(ctx, messageParams)
 
-	return message.Content[0].Text, nil
+	return stream
 }

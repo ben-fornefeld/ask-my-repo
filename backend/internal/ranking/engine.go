@@ -6,6 +6,7 @@ import (
 	"log"
 	"rankmyrepo/internal/parser"
 	"sort"
+	"sync"
 
 	"github.com/replicate/replicate-go"
 )
@@ -24,6 +25,7 @@ func NewEngine(r8 *replicate.Client, maxWorkers int) *Engine {
 
 func (e *Engine) RankChunks(ctx context.Context, query string, chunks map[string]parser.ParsedChunk, scoreThreshold float64) ([]RankedChunk, error) {
 	log.Printf("Starting to rank %d chunks for query: %s", len(chunks), query)
+
 	// worker pool for parallel ranking
 	results := make(chan RankedChunk, len(chunks))
 	errors := make(chan error, len(chunks))
@@ -110,4 +112,54 @@ func (e *Engine) RankSingleChunk(ctx context.Context, query string, chunk parser
 	}
 
 	return parseScore(result)
+}
+
+func (e *Engine) RankChunksStream(ctx context.Context, query string, chunks map[string]parser.ParsedChunk, scoreThreshold float64, parsedChan chan<- parser.ParsedChunk, rankedChan chan<- RankedChunk) error {
+	log.Printf("Starting to rank %d chunks for query: %s", len(chunks), query)
+
+	errors := make(chan error, len(chunks))
+	sem := make(chan struct{}, e.maxWorkers)
+
+	var wg sync.WaitGroup
+	for _, chunk := range chunks {
+		wg.Add(1)
+		go func(c parser.ParsedChunk) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			parsedChan <- c
+
+			score, err := e.RankSingleChunk(ctx, query, c)
+			if err != nil {
+				errors <- err
+				return
+			}
+
+			if score >= scoreThreshold {
+				ranked := RankedChunk{
+					ParsedChunk: c,
+					Score:      score,
+				}
+				select {
+				case rankedChan <- ranked:
+				case <-ctx.Done():
+					errors <- ctx.Err()
+				}
+			}
+		}(chunk)
+	}
+
+	go func() {
+		wg.Wait()
+		close(errors)
+	}()
+
+	for err := range errors {
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

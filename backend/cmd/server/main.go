@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
 	"rankmyrepo/internal/api"
 	"rankmyrepo/internal/completion"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/replicate/replicate-go"
 )
@@ -58,7 +58,26 @@ func main() {
 		log.Fatal(err)
 	}
 
-	http.HandleFunc("/query", handler.RankCode)
+	r := gin.Default()
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
+
+	r.POST("/query", handler.Query)
+
+	log.Printf("Server starting on :8080")
+	if err := r.Run(":8080"); err != nil {
+		log.Fatal(err)
+	}
 }

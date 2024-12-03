@@ -5,3 +5,4 @@ type APIError struct {
 	Code    int    `json:"code"`
 	Message string `json:"details,omitempty"`
 }
+
