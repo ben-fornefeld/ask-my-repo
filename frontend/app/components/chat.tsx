@@ -6,6 +6,9 @@ import type {
   ParsedChunk,
   RankedChunk,
 } from "../lib/types";
+import { motion } from "framer-motion";
+import { brutalistSlideMotion } from "../lib/utils";
+import Badge from "./ui/badge";
 
 interface ChatState {
   isLoading: boolean;
@@ -172,6 +175,12 @@ export default function Chat() {
           error:
             error instanceof Error ? error.message : "Unknown error occurred",
         }));
+      } finally {
+        isProcessingRef.current = false;
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+        }));
       }
     },
     [processQueue]
@@ -192,18 +201,40 @@ export default function Chat() {
       {state.error && <div className="text-red-500">Error: {state.error}</div>}
 
       {state.parsedChunks.length > 0 && (
-        <div className="text-gray-500">
+        <motion.div
+          variants={brutalistSlideMotion}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
           Processed {state.parsedChunks.length} files...
-        </div>
+        </motion.div>
       )}
 
       {state.rankedChunks.length > 0 && (
-        <div className="text-gray-500">
-          Found {state.rankedChunks.length} relevant files...
-        </div>
+        <motion.div
+          variants={brutalistSlideMotion}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="bg-white w-full flex gap-3 flex-wrap dark:bg-secondaryBlack p-2 rounded-base border-2 border-border dark:border-darkBorder shadow-light dark:shadow-dark"
+        >
+          <p className="w-full">
+            Found {state.rankedChunks.length} relevant files...
+          </p>
+          {state.rankedChunks.map((chunk) => (
+            <Badge
+              key={chunk.ParsedChunk.FilePath}
+              text={chunk.ParsedChunk.FilePath}
+              className="text-xs"
+            />
+          ))}
+        </motion.div>
       )}
 
-      {state.completion && <RenderCompletion completion={state.completion} />}
+      {state.completion && (
+        <RenderCompletion completion={state.completion || ""} />
+      )}
 
       <PromptForm onSubmit={handleSubmit} />
     </div>
