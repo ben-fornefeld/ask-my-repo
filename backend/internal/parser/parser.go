@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/sabhiram/go-gitignore"
+	ignore "github.com/sabhiram/go-gitignore"
 )
 
 type Parser struct {
@@ -100,11 +100,11 @@ func (p *Parser) ParseRepository(ctx context.Context, repoURL string, ignorePatt
 		}
 
 		chunk := ParsedChunk{
-			FilePath: path,
+			FilePath: relPath,
 			Content:  string(content),
 		}
 
-		chunks[path] = chunk
+		chunks[relPath] = chunk
 
 		return nil
 	})

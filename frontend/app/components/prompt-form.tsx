@@ -2,7 +2,7 @@ import { useState } from "react";
 import { FaGithub } from "react-icons/fa";
 
 interface PromptFormProps {
-  onSubmit: (query: string, repoPath: string) => void;
+  onSubmit: (query: string, repoPath: string, ignorePatterns: string[]) => void;
 }
 
 export default function PromptForm({ onSubmit }: PromptFormProps) {
@@ -13,10 +13,20 @@ export default function PromptForm({ onSubmit }: PromptFormProps) {
     }
     return "";
   });
-  const [errors, setErrors] = useState({ query: "", repoPath: "" });
+  const [ignorePatterns, setIgnorePatterns] = useState(() => {
+    if (typeof window !== "undefined") {
+      return JSON.parse(localStorage.getItem("ignorePatterns") || "[]");
+    }
+    return [];
+  });
+  const [errors, setErrors] = useState({
+    query: "",
+    repoPath: "",
+    ignorePatterns: "",
+  });
 
   const validateForm = () => {
-    const newErrors = { query: "", repoPath: "" };
+    const newErrors = { query: "", repoPath: "", ignorePatterns: "" };
     let isValid = true;
 
     if (!query.trim()) {
@@ -39,7 +49,7 @@ export default function PromptForm({ onSubmit }: PromptFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(query, repoPath);
+      onSubmit(query, repoPath, ignorePatterns);
     }
   };
 
@@ -52,7 +62,7 @@ export default function PromptForm({ onSubmit }: PromptFormProps) {
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
       <div className="relative flex w-min items-center rounded-base border-2 overflow-x-hidden border-border dark:border-darkBorder font-base shadow-light dark:shadow-dark">
         <span className="absolute left-3 text-gray-500">
           <FaGithub />
@@ -70,10 +80,7 @@ export default function PromptForm({ onSubmit }: PromptFormProps) {
         />
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex w-min items-center rounded-base border-2 overflow-x-hidden border-border dark:border-darkBorder font-base shadow-light dark:shadow-dark"
-      >
+      <div className="flex w-min items-center rounded-base border-2 overflow-x-hidden border-border dark:border-darkBorder font-base shadow-light dark:shadow-dark">
         <input
           className={`bg-white dark:bg-secondaryBlack w-[400px] min-w-[14ch] p-[10px] outline-none ${
             errors.query ? "border-red-500" : ""
@@ -92,12 +99,38 @@ export default function PromptForm({ onSubmit }: PromptFormProps) {
         >
           Go
         </button>
-      </form>
+      </div>
+
+      <div className="relative flex w-min items-center rounded-base border-2 overflow-x-hidden border-border dark:border-darkBorder font-base shadow-light dark:shadow-dark">
+        <textarea
+          className={`bg-white dark:bg-secondaryBlack w-[350px] p-[5px] outline-none text-xs resize-y min-h-[60px]`}
+          name="ignorePatterns"
+          id="ignorePatterns"
+          placeholder="Enter ignore patterns (one per line):&#10;*.test.ts"
+          value={ignorePatterns.join("\n")}
+          onChange={(e) => {
+            const patterns = e.target.value
+              .split("\n")
+              .map((p) => p.trim())
+              .filter((p) => p !== "");
+            setIgnorePatterns(patterns);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("ignorePatterns", JSON.stringify(patterns));
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.shiftKey && e.key === "Enter") {
+              e.stopPropagation();
+            }
+          }}
+        />
+      </div>
+
       {errors && (
         <span className="text-red-500 text-xs ">
           {errors.query || errors.repoPath}
         </span>
       )}
-    </div>
+    </form>
   );
 }

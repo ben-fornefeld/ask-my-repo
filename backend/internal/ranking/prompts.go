@@ -9,32 +9,25 @@ import (
 
 // TODO: use <thinking> tags for chain of thought if necessary
 
-var systemPrompt = `You are a code ranking assistant, which sees code chunks of a code 
-repository and needs to rank the importance of these with regard to the users input query.
-Based on the importance score, the code chunks will be fed into another LLM to give accurate 
-answers to the users query with proper repo context.`
+var systemPrompt = `You are a code ranking assistant. Your task is to analyze code chunks and assign them relevance scores based on how well they help answer the user's query. Be direct and precise in your scoring. Only output a score tag with a number between 0.0 and 1.0. Higher scores mean the code is more relevant for answering the query.`
 
 func buildRankingPrompt(query string, chunk parser.ParsedChunk) string {
-	return `You are a code ranking assistant, which sees code chunks of a code 
-repository and needs to rank the importance of these with regard to the users input query.
-Based on the importance score, the code chunks will be fed into another LLM to give accurate 
-answers to the users query with proper repo context.
+	return `Rate how relevant this code is to answering the query.
+Score from 0.0 to 1.0 with max 1 decimal point.
+Return ONLY <score>X</score> where X is the score.
+0.0 = not relevant at all
+1.0 = highly relevant
 
-Analyze the code snippet's relevance to the query.
-Return ONLY a score between 0.0 and 1.0 wrapped in XML tags <score></score>.
-1.0 means highly relevant, 0.0 means not relevant at all.
-DO NOT include any other text or explanations in your response.
+Query: ` + query + `
 
-<query>` + query + `</query>
+File: ` + chunk.FilePath + `
+Code:
+` + chunk.Content + `
 
-<file>` + chunk.FilePath + `</file>
-<content>` + chunk.Content + `</content>
-
-Remember: Respond ONLY with <score>X</score> where X is a number between 0.0 and 1.0`
+Remember: Just return <score>X</score> with X between 0.0-1.0, one decimal max.`
 }
 
 func parseScore(response string) (float64, error) {
-	// Find content between <score> and </score> tags
 	startTag := "<score>"
 	endTag := "</score>"
 
@@ -48,19 +41,19 @@ func parseScore(response string) (float64, error) {
 		return 0, fmt.Errorf("no end tag found in response")
 	}
 
-	// Extract the score string
 	scoreStr := strings.TrimSpace(response[startIndex+len(startTag) : endIndex])
 
-	// Parse the score as float64
 	score, err := strconv.ParseFloat(scoreStr, 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse score: %w", err)
 	}
 
-	// Validate score range
 	if score < 0 || score > 1 {
 		return 0, fmt.Errorf("score %f is outside valid range [0,1]", score)
 	}
+
+	// Round to 1 decimal place
+	score = float64(int(score*10)) / 10
 
 	return score, nil
 }

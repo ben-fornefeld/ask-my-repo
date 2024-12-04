@@ -12,15 +12,10 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"github.com/replicate/replicate-go"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file:", err)
-	}
-
 	textMimeTypes := map[string]bool{
 		"text/":                     true,
 		"application/json":          true,
@@ -42,7 +37,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ranker := ranking.NewEngine(r8, 100)
+	ranker := ranking.NewEngine(r8, 50)
 
 	anthropicClient := anthropic.NewClient(option.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")))
 	if err != nil {
@@ -61,7 +56,7 @@ func main() {
 	r := gin.Default()
 
 	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", os.Getenv("FRONTEND_URL"))
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")

@@ -71,7 +71,7 @@ export default function Chat() {
   }, [insertCompletionInBatches]);
 
   const handleSubmit = useCallback(
-    async (query: string, repopath: string) => {
+    async (query: string, repopath: string, ignorepatterns: string[]) => {
       setState({
         isLoading: true,
         parsedChunks: [],
@@ -82,7 +82,7 @@ export default function Chat() {
       const body = {
         query,
         repopath,
-        ignorepatterns: ["example/"],
+        ignorepatterns,
         scorethreshold: 0.2,
       };
 
@@ -111,61 +111,123 @@ export default function Chat() {
           const { value, done } = await reader.read();
           if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
 
-          const messages = buffer.split("\n\n");
-          buffer = messages.pop() || "";
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
 
-          for (const message of messages) {
-            if (message.startsWith("data: ")) {
-              const jsonStr = message.slice(6);
-              const chunk: QueryResponseChunk = JSON.parse(jsonStr);
+          for (const line of lines) {
+            if (!line.trim()) continue;
 
-              switch (chunk.type) {
-                case "ranking.parsed": {
-                  if (chunk.parsed_chunk) {
+            if (line.startsWith("data: ")) {
+              try {
+                const jsonStr = line.slice(6);
+                const chunk: QueryResponseChunk = JSON.parse(jsonStr);
+
+                switch (chunk.type) {
+                  case "ranking.parsed": {
+                    if (chunk.parsed_chunk) {
+                      setState((prevState) => ({
+                        ...prevState,
+                        parsedChunks: [
+                          ...prevState.parsedChunks,
+                          chunk.parsed_chunk!,
+                        ],
+                      }));
+                    }
+                    break;
+                  }
+
+                  case "ranking.ranked": {
+                    if (chunk.ranked_chunk) {
+                      setState((prevState) => ({
+                        ...prevState,
+                        rankedChunks: [
+                          ...prevState.rankedChunks,
+                          chunk.ranked_chunk!,
+                        ],
+                      }));
+                    }
+                    break;
+                  }
+
+                  case "completion.delta": {
+                    if (chunk.completion) {
+                      completionQueueRef.current += chunk.completion;
+                      await processQueue();
+                    }
+                    break;
+                  }
+
+                  case "error": {
                     setState((prevState) => ({
                       ...prevState,
-                      parsedChunks: [
-                        ...prevState.parsedChunks,
-                        chunk.parsed_chunk!,
-                      ],
+                      error: chunk.error,
+                      isLoading: false,
                     }));
+                    break;
                   }
-                  break;
                 }
-
-                case "ranking.ranked": {
-                  if (chunk.ranked_chunk) {
-                    setState((prevState) => ({
-                      ...prevState,
-                      rankedChunks: [
-                        ...prevState.rankedChunks,
-                        chunk.ranked_chunk!,
-                      ],
-                    }));
-                  }
-                  break;
-                }
-
-                case "completion.delta": {
-                  if (chunk.completion) {
-                    completionQueueRef.current += chunk.completion;
-                    await processQueue();
-                  }
-                  break;
-                }
-
-                case "error": {
-                  setState((prevState) => ({
-                    ...prevState,
-                    error: chunk.error,
-                    isLoading: false,
-                  }));
-                  break;
-                }
+              } catch (e) {
+                console.warn("Failed to parse SSE message:", e);
+                continue;
               }
             }
+          }
+        }
+
+        if (buffer.trim() && buffer.startsWith("data: ")) {
+          try {
+            const jsonStr = buffer.slice(6);
+            const chunk: QueryResponseChunk = JSON.parse(jsonStr);
+
+            switch (chunk.type) {
+              case "ranking.parsed": {
+                if (chunk.parsed_chunk) {
+                  setState((prevState) => ({
+                    ...prevState,
+                    parsedChunks: [
+                      ...prevState.parsedChunks,
+                      chunk.parsed_chunk!,
+                    ],
+                  }));
+                }
+                break;
+              }
+
+              case "ranking.ranked": {
+                if (chunk.ranked_chunk) {
+                  setState((prevState) => ({
+                    ...prevState,
+                    rankedChunks: [
+                      ...prevState.rankedChunks,
+                      chunk.ranked_chunk!,
+                    ],
+                  }));
+                }
+                break;
+              }
+
+              case "completion.delta": {
+                if (chunk.completion) {
+                  completionQueueRef.current += chunk.completion;
+                  await processQueue();
+                }
+                break;
+              }
+
+              case "error": {
+                setState((prevState) => ({
+                  ...prevState,
+                  error: chunk.error,
+                  isLoading: false,
+                }));
+                break;
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to parse final SSE message:", e);
           }
         }
       } catch (error) {
@@ -226,7 +288,7 @@ export default function Chat() {
             <Badge
               key={chunk.ParsedChunk.FilePath}
               text={chunk.ParsedChunk.FilePath}
-              className="text-xs"
+              className="text-xs whitespace-nowrap"
             />
           ))}
         </motion.div>
