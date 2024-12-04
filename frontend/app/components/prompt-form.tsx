@@ -13,9 +13,9 @@ export default function PromptForm({ onSubmit }: PromptFormProps) {
     }
     return "";
   });
-  const [ignorePatterns, setIgnorePatterns] = useState(() => {
+  const [ignorePatterns, setIgnorePatterns] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return JSON.parse(localStorage.getItem("ignorePatterns") || "[]");
+      return JSON.parse(localStorage.getItem("ignorePatterns") || "");
     }
     return [];
   });
@@ -49,7 +49,12 @@ export default function PromptForm({ onSubmit }: PromptFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(query, repoPath, ignorePatterns);
+      const patterns = ignorePatterns
+        .split("\n")
+        .map((p) => p.trim())
+        .filter((p) => p !== "");
+
+      onSubmit(query, repoPath, patterns);
     }
   };
 
@@ -107,15 +112,14 @@ export default function PromptForm({ onSubmit }: PromptFormProps) {
           name="ignorePatterns"
           id="ignorePatterns"
           placeholder="Enter ignore patterns (one per line):&#10;*.test.ts"
-          value={ignorePatterns.join("\n")}
+          value={ignorePatterns}
           onChange={(e) => {
-            const patterns = e.target.value
-              .split("\n")
-              .map((p) => p.trim())
-              .filter((p) => p !== "");
-            setIgnorePatterns(patterns);
+            setIgnorePatterns(e.target.value);
             if (typeof window !== "undefined") {
-              localStorage.setItem("ignorePatterns", JSON.stringify(patterns));
+              localStorage.setItem(
+                "ignorePatterns",
+                JSON.stringify(e.target.value)
+              );
             }
           }}
           onKeyDown={(e) => {
