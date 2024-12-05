@@ -15,7 +15,7 @@ export default function PromptForm({ onSubmit }: PromptFormProps) {
   });
   const [ignorePatterns, setIgnorePatterns] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return JSON.parse(localStorage.getItem("ignorePatterns") || "");
+      return JSON.parse(localStorage.getItem("ignorePatterns") || "[]");
     }
     return [];
   });
